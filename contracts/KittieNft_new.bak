@@ -449,11 +449,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         if (_amount > contractBalance) {
             _amount = contractBalance;
         }
-        //weth.withdraw(contractBalance);
-
-        (bool success, bytes memory data) = address(weth).delegatecall(
-            abi.encodeWithSignature("withdraw(uint256)", contractBalance)
-        );
-        require(success, "Transfer failed.");
+        weth.withdraw(contractBalance);
     }
 }

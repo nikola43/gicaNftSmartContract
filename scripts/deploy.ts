@@ -82,7 +82,7 @@ async function main() {
     console.log(colors.cyan('Contract Address: ') + colors.yellow(kittieNft.address));
     console.log(colors.yellow('verifying...'));
     await test_util.updateABI(contractName)
-    await test_util.verify(kittieNft.address, contractName, [1, 20, "https://api.kitties.com/kitties/", parseEther("0.1"), 100, "KittieNft", "KTNFT", "https://api.kitties.com/kitties/", "https://api.kitties.com/kitties/"])
+    await test_util.verify(kittieNft.address, contractName, [1, 20, "https://api.kitties.com/kitties/", parseEther("0.01"), 100, "KittieNft", "KTNFT", "https://api.kitties.com/kitties/", "https://api.kitties.com/kitties/"])
 }
 
 main()

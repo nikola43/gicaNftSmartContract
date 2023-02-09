@@ -87,7 +87,7 @@ const config: HardhatUserConfig = {
       chainId: 137,
     },
     mumbai: {
-      url: 'https://rpc-mumbai.maticvigil.com/',
+      url: 'https://rpc.ankr.com/polygon_mumbai',
       accounts: [`${mnemonic}`],
       chainId: 80001,
       gasMultiplier: 2
@@ -157,8 +157,8 @@ const config: HardhatUserConfig = {
       ftmTestnet: "IJ7P45C1D6CWVVQZ3FAYMFMR433IYEJ3EW", // ftm
 
 
-      polygon: "ZC7F1IU2EXVW2K171X5FW3M4TYHF3KW2DF", // ftm
-      //mumbai: "ZC7F1IU2EXVW2K171X5FW3M4TYHF3KW2DF", // polygon
+      polygon: "YEIG77M4C7ICS4TMDQAJPWJGJWF5CFY4Y3", // polygon
+      polygonMumbai: "YEIG77M4C7ICS4TMDQAJPWJGJWF5CFY4Y3", // polygon
 
 
       goerli: "UVGM9GGPHXP755SK9DKI3BED9EBA5RC16P", // eth
