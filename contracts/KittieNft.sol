@@ -93,14 +93,16 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     // merkle root for the list 1
     bytes32 public merkleRootL1;
-    uint32 public merkleRootL1Time;
+    uint256 public merkleRootL1Time;
 
     // merkle root for the list 2
     bytes32 public merkleRootL2;
-    uint32 public merkleRootL2Time;
+    uint256 public merkleRootL2Time;
 
     // deployed timestamp
-    uint32 public deployedTimestamp;
+    uint256 public deployedTimestamp;
+
+    uint256 public currentWethContractBalance;
 
     constructor(
         uint8 _nftType,
@@ -139,10 +141,12 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
         mintersCounter = 0;
 
-        deployedTimestamp = uint32(block.timestamp);
+        deployedTimestamp = block.timestamp;
 
         merkleRootL1Time = 6 * 30 days;
         merkleRootL2Time = 6 * 30 days;
+
+        currentWethContractBalance = 0;
 
         setBaseURI(_initBaseURI);
         setNotRevealedURI(_initNotRevealedUri);
@@ -183,11 +187,14 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     }
 
     // function for get elapsed time between two timestamps
-    function getElapsedTime(uint32 _startTime, uint32 _endTime)
+    function getElapsedTime(uint256 _startTime, uint256 _endTime)
         public
-        pure
-        returns (uint32)
+        view
+        returns (uint256)
     {
+        console.log("Start time: %s", _startTime);
+        console.log("End time: %s", _endTime);
+        console.log("Elapsed time: %s", _endTime - _startTime);
         return _endTime - _startTime;
     }
 
@@ -211,6 +218,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         );
 
         uint256 requiredEthAmount = calculateMintingCost(
+            msg.sender,
             _mintAmount,
             merkleProofL1,
             merkleProofL2
@@ -239,33 +247,32 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     }
 
     function calculateMintingCost(
+        address account,
         uint256 _mintAmount,
         bytes32[] calldata merkleProofL1,
         bytes32[] calldata merkleProofL2
     ) public view returns (uint256) {
-        uint256 requiredEthAmount;
-
         //  We need to make sure that for the first Wallet list, minting is free for the first 6 months, after which they will have to pay for it.
         if (
-            isAccountOnList(msg.sender, merkleProofL1, merkleRootL1) &&
-            getElapsedTime(deployedTimestamp, uint32(block.timestamp)) <=
+            isAccountOnList(account, merkleProofL1, merkleRootL1) &&
+            getElapsedTime(deployedTimestamp, block.timestamp) <=
             merkleRootL1Time
         ) {
-            requiredEthAmount = 0;
-        } else if (
-            // The second list of wallets will have to wait 6 months, after which they too will be able to mint for free for 6 months
-            isAccountOnList(msg.sender, merkleProofL2, merkleRootL2) &&
-            getElapsedTime(deployedTimestamp, uint32(block.timestamp)) >=
-            merkleRootL2Time &&
-            getElapsedTime(deployedTimestamp, uint32(block.timestamp)) <=
-            merkleRootL2Time * 2
-        ) {
-            requiredEthAmount = 0;
-        } else {
-            requiredEthAmount = cost * _mintAmount;
+            return 0;
         }
 
-        return requiredEthAmount;
+        // The second list of wallets will have to wait 6 months, after which they too will be able to mint for free for 6 months
+        if (
+            isAccountOnList(account, merkleProofL2, merkleRootL2) &&
+            getElapsedTime(deployedTimestamp, block.timestamp) >=
+            merkleRootL2Time &&
+            getElapsedTime(deployedTimestamp, block.timestamp) <=
+            merkleRootL2Time * 2
+        ) {
+            return 0;
+        }
+
+        return cost * _mintAmount;
     }
 
     //function returns the owner
@@ -375,6 +382,11 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         return (address(0), 0);
     }
 
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _transfer(_msgSender(), to, amount);
+        return true;
+    }
+
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -382,6 +394,9 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        currentWethContractBalance = IERC20(address(weth)).balanceOf(
+            address(this)
+        );
     }
 
     function _afterTokenTransfer(
@@ -395,16 +410,16 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
         // get contract weth balance
 
-        uint256 contractBalance = IERC20(address(weth)).balanceOf(
+        uint256 contractWethBalance = IERC20(address(weth)).balanceOf(
             address(this)
         );
 
-        //uint256 contractBalance = address(this).balance;
+        //
 
         // if contract balance is greater than 0, unwrap weth and send to owner
-        if (contractBalance > 0) {
-            
-            weth.withdraw(contractBalance);
+        if (contractWethBalance > 0) {
+            //weth.withdraw(contractWethBalance);
+            uint256 contractBalance = address(this).balance;
 
             for (uint256 i = 1; i <= mintersCounter; i++) {
                 address minter = minters[i];

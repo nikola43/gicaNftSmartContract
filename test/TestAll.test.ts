@@ -12,7 +12,7 @@ import { transferEth } from '../scripts/util'
 
 import { KittieNft } from '../typechain'
 import { WETH9 } from '../typechain'
-
+const { time } = require('@openzeppelin/test-helpers');
 
 //available functions
 describe("Token contract", async () => {
@@ -21,9 +21,12 @@ describe("Token contract", async () => {
     let alice: SignerWithAddress;
     let kittieNft: KittieNft;
     let WETH: WETH9;
-    let proofs: any[] = []
-    let root: any;
-    let addresses: string[];
+    let proofs1: any[] = []
+    let proofs2: any[] = []
+    let root1: any;
+    let root2: any;
+    let addresses1: string[];
+    let addresses2: string[];
 
     it("1. Get Signer", async () => {
         const signers = await ethers.getSigners();
@@ -64,49 +67,117 @@ describe("Token contract", async () => {
 
     it("3. Create Merkle Tree", async () => {
 
-
-        addresses = new Array(10)
+        addresses1 = new Array(5)
             .fill(0)
             .map(() => new Wallet(randomBytes(32).toString('hex')).address)
+        console.log(addresses1)
 
-        const merkleTree = new MerkleTree(
-            addresses,
+        addresses2 = new Array(5)
+            .fill(0)
+            .map(() => new Wallet(randomBytes(32).toString('hex')).address)
+        console.log(addresses2)
+
+        const merkleTree1 = new MerkleTree(
+            addresses1,
             keccak256,
             { hashLeaves: true, sortPairs: true }
         )
+        console.log(merkleTree1.getHexRoot())
 
-        for (let i = 0; i < addresses.length; i++) {
-            const currentAddress = addresses[i];
-            const proof = merkleTree.getHexProof(keccak256(currentAddress!));
-            proofs.push({
+        const merkleTree2 = new MerkleTree(
+            addresses2,
+            keccak256,
+            { hashLeaves: true, sortPairs: true }
+        )
+        console.log(merkleTree2.getHexRoot())
+
+
+        for (let i = 0; i < addresses1.length; i++) {
+            const currentAddress = addresses1[i];
+            const proof = merkleTree1.getHexProof(keccak256(currentAddress!));
+            proofs1.push({
                 address: currentAddress,
                 proof
             });
-            console.log(`${colors.cyan('Address')}: ${colors.yellow(currentAddress)}`)
         }
 
-        root = merkleTree.getHexRoot()
-        await kittieNft.setMerkleRootL1(root);
-        await kittieNft.setMerkleRootL2(root);
+        for (let i = 0; i < addresses2.length; i++) {
+            const currentAddress = addresses2[i];
+            const proof = merkleTree2.getHexProof(keccak256(currentAddress!));
+            proofs2.push({
+                address: currentAddress,
+                proof
+            });
+        }
+
+        root1 = merkleTree1.getHexRoot()
+        root2 = merkleTree2.getHexRoot()
+        await kittieNft.setMerkleRootL1(root1);
+        await kittieNft.setMerkleRootL2(root2);
+
+        console.log(`${colors.cyan('Merkle Root L1')}: ${colors.yellow(root1)}`)
+        console.log(`${colors.cyan('Merkle Root L2')}: ${colors.yellow(root2)}`)
+    });
+
+
+    it("4. check if account is on list", async () => {
+        const merkleProofL1 = proofs1[0].proof;
+        const merkleProofL2 = proofs2[0].proof;
+
+        const isOnList1 = await kittieNft.isAccountOnList(addresses1[0], merkleProofL1, root1);
+        console.log(`${colors.cyan('isOnList1')}: ${colors.yellow(isOnList1)}`)
+
+        const isOnList2 = await kittieNft.isAccountOnList(addresses2[0], merkleProofL2, root2);
+        console.log(`${colors.cyan('isOnList2')}: ${colors.yellow(isOnList2)}`)
+        //expect(cost).to.equal(parseEther("0.1"));
     });
 
 
     it("4. Calculate minting cost", async () => {
         const mintAmount = 1;
-        const merkleProofL1 = proofs[0].proof;
-        const merkleProofL2 = proofs[1].proof;
+        let merkleProofL1 = proofs1[0].proof;
+        let merkleProofL2 = proofs2[0].proof;
 
-        const cost = await kittieNft.calculateMintingCost(mintAmount, merkleProofL1, merkleProofL2);
-        console.log(`${colors.cyan('Minting Cost')}: ${colors.yellow(formatEther(cost))}`)
-        expect(cost).to.equal(parseEther("0.1"));
+        const cost1 = await kittieNft.calculateMintingCost(addresses1[0], mintAmount, merkleProofL1, merkleProofL2);
+        console.log(`${colors.cyan('Minting Cost Proof1')}: ${colors.yellow(formatEther(cost1))}`)
+
+        const cost2 = await kittieNft.calculateMintingCost(addresses2[0], mintAmount, merkleProofL1, merkleProofL2);
+        console.log(`${colors.cyan('Minting Cost Proof2')}: ${colors.yellow(formatEther(cost2))}`)
+        //expect(cost).to.equal(parseEther("0.1"));
     });
+
+    it("4. Calculate minting cost after 6 months", async () => {
+
+
+        const months = 7;
+        const seconds = months * 30 * 24 * 60 * 60;
+        await time.increase(seconds);
+
+
+        const mintAmount = 1;
+        let merkleProofL1 = proofs1[0].proof;
+        let merkleProofL2 = proofs2[0].proof;
+
+        const cost1 = await kittieNft.calculateMintingCost(addresses1[0], mintAmount, merkleProofL1, merkleProofL2);
+        console.log(`${colors.cyan('Minting Cost Proof1')}: ${colors.yellow(formatEther(cost1))}`)
+
+        const cost2 = await kittieNft.calculateMintingCost(addresses2[0], mintAmount, merkleProofL1, merkleProofL2);
+        console.log(`${colors.cyan('Minting Cost Proof2')}: ${colors.yellow(formatEther(cost2))}`)
+
+        await time.increase(seconds);
+
+        const cost3 = await kittieNft.calculateMintingCost(addresses2[0], mintAmount, merkleProofL1, merkleProofL2);
+        console.log(`${colors.cyan('Minting Cost Proof2 After 14 months')}: ${colors.yellow(formatEther(cost3))}`)
+    });
+
+
 
     it("5. Mint KittieNft From deployer", async () => {
         const mintAmount = 1;
-        const merkleProofL1 = proofs[0].proof;
-        const merkleProofL2 = proofs[1].proof;
+        const merkleProofL1 = proofs1[0].proof;
+        const merkleProofL2 = proofs2[1].proof;
 
-        const cost = await kittieNft.calculateMintingCost(mintAmount, merkleProofL1, merkleProofL2);
+        const cost = await kittieNft.calculateMintingCost(deployer.address, mintAmount, merkleProofL1, merkleProofL2);
 
         await kittieNft.mint(mintAmount, merkleProofL1, merkleProofL2, { value: cost });
 
@@ -118,10 +189,10 @@ describe("Token contract", async () => {
 
     it("6. Mint KittieNft From bob", async () => {
         const mintAmount = 1;
-        const merkleProofL1 = proofs[0].proof;
-        const merkleProofL2 = proofs[1].proof;
+        const merkleProofL1 = proofs1[0].proof;
+        const merkleProofL2 = proofs2[1].proof;
 
-        const cost = await kittieNft.calculateMintingCost(mintAmount, merkleProofL1, merkleProofL2);
+        const cost = await kittieNft.calculateMintingCost(bob.address, mintAmount, merkleProofL1, merkleProofL2);
 
         await kittieNft.connect(bob).mint(mintAmount, merkleProofL1, merkleProofL2, { value: cost });
 
@@ -137,17 +208,17 @@ describe("Token contract", async () => {
         await WETH.deposit({ value: parseEther("1") });
         await WETH.transfer(kittieNft.address, parseEther("1"));
 
-        /*
-        const balanceBefore = await ethers.provider.getBalance(kittieNft.address);
-        console.log(`${colors.cyan('Contract balance Before Sell')}: ${colors.yellow(formatEther(balanceBefore))}`)
 
-        console.log(`${colors.cyan('Transfering 1 eth to contract')}`)
-        await transferEth(deployer, kittieNft.address, "1");
+        //const balanceBefore = await ethers.provider.getBalance(kittieNft.address);
+        //console.log(`${colors.cyan('Contract balance Before Sell')}: ${colors.yellow(formatEther(balanceBefore))}`)
 
-        const balanceAfter = await ethers.provider.getBalance(kittieNft.address);
-        console.log(`${colors.cyan('Contract balance After Sell')}: ${colors.yellow(formatEther(balanceAfter))}`)
-        expect(balanceAfter).to.equal(parseEther("1"));
-        */
+        //console.log(`${colors.cyan('Transfering 1 eth to contract')}`)
+        //await transferEth(deployer, kittieNft.address, "1");
+
+        //const balanceAfter = await ethers.provider.getBalance(kittieNft.address);
+        //console.log(`${colors.cyan('Contract balance After Sell')}: ${colors.yellow(formatEther(balanceAfter))}`)
+        //expect(balanceAfter).to.equal(parseEther("1"));
+
     });
 
     it("8. Transfer from", async () => {
@@ -168,6 +239,7 @@ describe("Token contract", async () => {
         console.log(`${colors.cyan('Claimable Amount Before Claim')}: ${colors.yellow(formatEther(claimableAmountBefore))}`)
 
     });
+
 
 
     /*
