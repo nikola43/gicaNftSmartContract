@@ -7,6 +7,8 @@ const test_util = require('./util');
 const fs = require('fs');
 const lineByLine = require('n-readlines');
 
+import { KittieNft } from '../typechain'
+
 async function main() {
     const [signer] = await ethers.getSigners()
     if (signer === undefined) throw new Error('Deployer is undefined.')
@@ -18,6 +20,10 @@ async function main() {
     let addresses: string[] = []
     let proofs: any[] = []
     let rowCounter = 0;
+
+    let kittieNft: KittieNft;
+
+
 
     const liner = new lineByLine('addr-list.txt');
 
@@ -66,7 +72,7 @@ async function main() {
     console.log(colors.yellow('Deploying ') + colors.cyan(contractName) + colors.yellow('...'));
 
     const contractFactory = await ethers.getContractFactory(contractName)
-    const kittieNft = await contractFactory.deploy(
+    kittieNft = await contractFactory.deploy(
         1,
         20,
         "https://api.kitties.com/kitties/", // _newBaseURI
@@ -76,7 +82,7 @@ async function main() {
         "KTNFT", // _symbol
         "https://api.kitties.com/kitties/", // _initBaseURI
         "https://api.kitties.com/kitties/" // _initNotRevealedUri
-    );
+    ) as KittieNft;
     await kittieNft.deployed()
     await test_util.sleep(60);
     console.log(colors.cyan('Contract Address: ') + colors.yellow(kittieNft.address));

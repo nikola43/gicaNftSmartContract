@@ -30,12 +30,26 @@ import "hardhat/console.sol";
 */
 
 // interface for weth
+/*
 interface IWETH {
     function deposit() external payable;
 
     function transfer(address to, uint256 value) external returns (bool);
 
     function withdraw(uint256) external;
+
+    function transferFrom(
+        address src,
+        address dst,
+        uint256 wad
+    ) external returns (bool);
+}
+*/
+
+interface IWETH is IERC20 {
+    function deposit() external payable;
+
+    function withdraw(uint256 wad) external;
 }
 
 contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
@@ -135,12 +149,14 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     }
 
     receive() external payable {
+        /*
         console.log("Received Ether: %s", msg.value);
         // loop through the minters and add them to the claimable amount
         for (uint256 i = 1; i <= mintersCounter; i++) {
             address minter = minters[i];
             claimableAmount[minter] += msg.value / mintersCounter;
         }
+        */
     }
 
     // function for set merkle root L1
@@ -368,22 +384,41 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 firstTokenId,
+        uint256 batchSize
+    ) internal virtual override {
+        super._afterTokenTransfer(from, to, firstTokenId, batchSize);
+        console.log("After token transfer");
+
+        // get contract weth balance
+
+        uint256 contractBalance = IERC20(address(weth)).balanceOf(
+            address(this)
+        );
+
+        //uint256 contractBalance = address(this).balance;
+
+        // if contract balance is greater than 0, unwrap weth and send to owner
+        if (contractBalance > 0) {
+            
+            weth.withdraw(contractBalance);
+
+            for (uint256 i = 1; i <= mintersCounter; i++) {
+                address minter = minters[i];
+                claimableAmount[minter] += contractBalance / mintersCounter;
+            }
+        }
+    }
+
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId
     ) public virtual override(ERC721, IERC721) {
         super.safeTransferFrom(from, to, tokenId);
-
-        // get contract weth balance
-        uint256 contractBalance = IERC20(address(weth)).balanceOf(
-            address(this)
-        );
-
-        // if contract balance is greater than 0, unwrap weth and send to owner
-        if (contractBalance > 0) {
-            weth.withdraw(contractBalance);
-        }
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -442,18 +477,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     // function for unwrap weth
     function unwrapWeth(uint256 _amount) public onlyOwner {
-        uint256 contractBalance = IERC20(address(weth)).balanceOf(address(this));
-
-        require(contractBalance >= _amount, "Not enough weth in contract");
-
-        if (_amount > contractBalance) {
-            _amount = contractBalance;
-        }
-        //weth.withdraw(contractBalance);
-
-        (bool success, bytes memory data) = address(weth).delegatecall(
-            abi.encodeWithSignature("withdraw(uint256)", contractBalance)
-        );
-        require(success, "Transfer failed.");
+        weth.withdraw(_amount);
     }
 }

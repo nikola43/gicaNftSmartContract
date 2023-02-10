@@ -52,7 +52,7 @@ npx hardhat flatten contracts/MerkleAirdrop.sol > flattMerkleAirdrop.sol
 # Testing
 ## Run local node
 ```
-npx hardhat node --fork https://rpc.ankr.com/bsc_testnet_chapel
+npx hardhat node --fork https://goerli.infura.io/v3/d8200853cc4c4001956d0c1a2d0de540
 npx hardhat test test/TestAll.test.ts --network localhost
 ```
 
