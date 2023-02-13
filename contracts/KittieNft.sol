@@ -383,9 +383,11 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        /*
         currentWethContractBalance = IERC20(address(weth)).balanceOf(
             address(this)
         );
+        */
     }
 
     function _afterTokenTransfer(
@@ -398,7 +400,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         console.log("After token transfer");
 
         // check if from address have zero balance, if so, decrease number of holders
-        if (balanceOf(from) == 0) {
+        if (from != address(0) && balanceOf(from) == 0) {
             tokenHoldersMap.remove(from);
         }
         console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
@@ -409,6 +411,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         }
         console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
 
+        /*
         // get the current balance of the contract
         uint256 wethContractBalance = IERC20(address(weth)).balanceOf(
             address(this)
@@ -432,6 +435,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         }
 
         console.log("ethDiff: %s", ethDiff);
+        */
     }
 
     function safeTransferFrom(

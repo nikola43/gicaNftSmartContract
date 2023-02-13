@@ -48,7 +48,24 @@ describe("Token contract", async () => {
 
         WETH = await ethers.getContractAt("WETH9", "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6")
 
-        const KittieNftFactory = await ethers.getContractFactory("KittieNft");
+
+        const iterableMappingFactory = await ethers.getContractFactory("IterableMapping")
+        const IterableMappingDeployed = await iterableMappingFactory.deploy()
+        await IterableMappingDeployed.deployed()
+        console.log({
+            IterableMappingDeployed: IterableMappingDeployed.address
+        })
+
+
+        let contractName = "KittieNft"
+        console.log(colors.yellow('Deploying ') + colors.cyan(contractName) + colors.yellow('...'));
+
+        const KittieNftFactory = await ethers.getContractFactory(contractName, {
+            libraries: {
+                IterableMapping: IterableMappingDeployed.address
+            },
+        });
+
         kittieNft = await KittieNftFactory.deploy(
             1,
             20,
@@ -182,8 +199,8 @@ describe("Token contract", async () => {
         await kittieNft.mint(mintAmount, merkleProofL1, merkleProofL2, { value: cost });
 
         // print minters count
-        const mintersCount = await kittieNft.mintersCounter();
-        console.log(`${colors.cyan('Minters Count')}: ${colors.yellow(mintersCount)}`)
+        const mintersCount = await kittieNft.getNumberOfTokenHolders();
+        console.log(`${colors.cyan('getNumberOfTokenHolders')}: ${colors.yellow(mintersCount)}`)
         expect(mintersCount).to.equal(1);
     });
 
@@ -197,8 +214,8 @@ describe("Token contract", async () => {
         await kittieNft.connect(bob).mint(mintAmount, merkleProofL1, merkleProofL2, { value: cost });
 
         // print minters count
-        const mintersCount = await kittieNft.mintersCounter();
-        console.log(`${colors.cyan('Minters Count')}: ${colors.yellow(mintersCount)}`)
+        const mintersCount = await kittieNft.getNumberOfTokenHolders();
+        console.log(`${colors.cyan('getNumberOfTokenHolders')}: ${colors.yellow(mintersCount)}`)
         expect(mintersCount).to.equal(2);
     });
 
@@ -239,6 +256,7 @@ describe("Token contract", async () => {
         console.log(`${colors.cyan('Claimable Amount Before Claim')}: ${colors.yellow(formatEther(claimableAmountBefore))}`)
 
     });
+
 
 
 
