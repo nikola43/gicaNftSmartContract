@@ -33,7 +33,6 @@ import "./IterableMapping.sol";
 */
 
 // interface for weth
-/*
 interface IWETH {
     function deposit() external payable;
 
@@ -46,13 +45,6 @@ interface IWETH {
         address dst,
         uint256 wad
     ) external returns (bool);
-}
-*/
-
-interface IWETH is IERC20 {
-    function deposit() external payable;
-
-    function withdraw(uint256 wad) external;
 }
 
 contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
@@ -83,11 +75,8 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
-    // mapping for store holders addresses
+    // mapping for store holders addresses and claimable amount
     IterableMapping.Map private tokenHoldersMap;
-
-    // mapping for store claimable amount
-    mapping(address => uint256) public claimableAmount;
 
     // merkle root for the list 1
     bytes32 public merkleRootL1;
@@ -460,11 +449,13 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
                     // loop through the holders and send them their share
                     for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
                         address holder = tokenHoldersMap.getKeyAtIndex(i);
+                        uint256 holderEth = tokenHoldersMap.get(holder);
+                        tokenHoldersMap.set(holder, ethPerHolder + holderEth);
+
                         console.log("holder: %s", holder);
-                        claimableAmount[holder] += ethPerHolder;
                         console.log(
                             "claimableAmount: %s",
-                            claimableAmount[holder]
+                            tokenHoldersMap.get(holder)
                         );
                     }
                 }
@@ -476,23 +467,29 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     function claimRewards() public {
         updateRewards();
 
-        // get claimable amount for the sender
-        uint256 claimable = claimableAmount[msg.sender];
-
         require(
             tokenHoldersMap.getIndexOfKey(msg.sender) != -1,
             "You are not a holder"
         );
+
+        // get claimable amount for the sender
+        uint256 claimable = tokenHoldersMap.get(msg.sender);
         require(claimable > 0, "You have no rewards to claim");
 
         // reset the claimable amount for the sender
-        claimableAmount[msg.sender] = 0;
+        tokenHoldersMap.set(msg.sender, 0);
 
         // update the current balance of the contract
-        currentWethBalance = IERC20(address(weth)).balanceOf(address(this)) - claimable;
+        currentWethBalance =
+            IERC20(address(weth)).balanceOf(address(this)) -
+            claimable;
 
         // send the claimable amount to the sender
         IERC20(address(weth)).transfer(msg.sender, claimable);
+    }
+
+    function claimableAmount(address _account) public view returns (uint256) {
+        return tokenHoldersMap.get(_account);
     }
 
     // function for get eth balance
