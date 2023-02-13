@@ -100,7 +100,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     // deployed timestamp
     uint256 public deployedTimestamp;
 
-    uint256 public currentWethContractBalance;
+    uint256 public currentWethBalance;
 
     constructor(
         uint8 _nftType,
@@ -142,7 +142,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         merkleRootL1Time = 6 * 30 days;
         merkleRootL2Time = 6 * 30 days;
 
-        currentWethContractBalance = 0;
+        currentWethBalance = 0;
 
         setBaseURI(_initBaseURI);
         setNotRevealedURI(_initNotRevealedUri);
@@ -383,10 +383,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-
-        currentWethContractBalance = IERC20(address(weth)).balanceOf(
-            address(this)
-        );
     }
 
     function _afterTokenTransfer(
@@ -409,30 +405,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
             tokenHoldersMap.set(to, 0);
         }
         console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
-
-        // get the current balance of the contract
-        uint256 wethContractBalance = IERC20(address(weth)).balanceOf(
-            address(this)
-        );
-
-        // calculate the difference between the current balance and the previous balance
-        uint256 ethDiff = wethContractBalance - currentWethContractBalance;
-
-        // if the difference is greater than 0, send split the difference between the holders
-        if (ethDiff > 0) {
-            uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
-            console.log("ethPerHolder: %s", ethPerHolder);
-
-            // loop through the holders and send them their share
-            for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
-                address holder = tokenHoldersMap.getKeyAtIndex(i);
-                console.log("holder: %s", holder);
-                claimableAmount[holder] += ethPerHolder;
-                console.log("claimableAmount: %s", claimableAmount[holder]);
-            }
-        }
-
-        console.log("ethDiff: %s", ethDiff);
     }
 
     function safeTransferFrom(
@@ -461,18 +433,66 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         return super.supportsInterface(interfaceId);
     }
 
+    function updateRewards() public {
+        // get the current balance of the contract
+        uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
+
+        // check if the contract has any eth, if so, update currentWethContractBalance
+        if (wethBalance > 0) {
+            // check if the contract balance has changed and is greater than the previous balance
+            if (
+                wethBalance != currentWethBalance &&
+                wethBalance > currentWethBalance
+            ) {
+                console.log("wethContractBalance: %s", wethBalance);
+                console.log("currentWethBalance: %s", currentWethBalance);
+
+                // calculate the difference between the current balance and the previous balance
+                uint256 ethDiff = wethBalance - currentWethBalance;
+                console.log("ethDiff: %s", ethDiff);
+
+                // if the difference is greater than 0, send split the difference between the holders
+                if (ethDiff > 0) {
+                    uint256 ethPerHolder = ethDiff /
+                        tokenHoldersMap.keys.length;
+                    console.log("ethPerHolder: %s", ethPerHolder);
+
+                    // loop through the holders and send them their share
+                    for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+                        address holder = tokenHoldersMap.getKeyAtIndex(i);
+                        console.log("holder: %s", holder);
+                        claimableAmount[holder] += ethPerHolder;
+                        console.log(
+                            "claimableAmount: %s",
+                            claimableAmount[holder]
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     // function for claim the rewards
     function claimRewards() public {
+        updateRewards();
+
+        // get claimable amount for the sender
+        uint256 claimable = claimableAmount[msg.sender];
+
         require(
             tokenHoldersMap.getIndexOfKey(msg.sender) != -1,
             "You are not a holder"
         );
-        require(
-            claimableAmount[msg.sender] > 0,
-            "You have no rewards to claim"
-        );
+        require(claimable > 0, "You have no rewards to claim");
+
+        // reset the claimable amount for the sender
         claimableAmount[msg.sender] = 0;
-        IERC20(address(weth)).transfer(msg.sender, claimableAmount[msg.sender]);
+
+        // update the current balance of the contract
+        currentWethBalance = IERC20(address(weth)).balanceOf(address(this)) - claimable;
+
+        // send the claimable amount to the sender
+        IERC20(address(weth)).transfer(msg.sender, claimable);
     }
 
     // function for get eth balance

@@ -23,6 +23,9 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 // import console.log for debugging
 import "hardhat/console.sol";
 
+// import IterableMapping for store holders addresses
+import "./IterableMapping.sol";
+
 /*
 1.) Type#1 - 10k pieces – 100% - 0,03 ETH 
 2.) Type#2 - 20k pieces – 60% - 0,015 ETH 
@@ -54,6 +57,7 @@ interface IWETH is IERC20 {
 
 contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
     using Strings for uint256;
+    using IterableMapping for IterableMapping.Map;
     IWETH public weth;
     uint8 public nftType;
     uint8 public discountPercentage;
@@ -79,17 +83,11 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
-    // mapping for store minters ids
-    mapping(uint256 => address) public minters;
-
-    // mapping for store users who minted
-    mapping(address => bool) public is_minter;
+    // mapping for store holders addresses
+    IterableMapping.Map private tokenHoldersMap;
 
     // mapping for store claimable amount
     mapping(address => uint256) public claimableAmount;
-
-    // counter of users who minted
-    uint256 public mintersCounter;
 
     // merkle root for the list 1
     bytes32 public merkleRootL1;
@@ -139,8 +137,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         //the uri of the not revealed picture
         notRevealedUri = "";
 
-        mintersCounter = 0;
-
         deployedTimestamp = block.timestamp;
 
         merkleRootL1Time = 6 * 30 days;
@@ -184,6 +180,10 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
                 merkleRoot,
                 keccak256(abi.encodePacked(account))
             );
+    }
+
+    function getNumberOfTokenHolders() external view returns (uint256) {
+        return tokenHoldersMap.keys.length;
     }
 
     // function for get elapsed time between two timestamps
@@ -237,12 +237,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
             _safeMint(msg.sender, tokenId);
             // set the royalties for the NFT
             setRoyalties(tokenId, payable(address(this)), 1000);
-        }
-
-        if (!is_minter[msg.sender]) {
-            mintersCounter++;
-            is_minter[msg.sender] = true;
-            minters[mintersCounter] = msg.sender;
         }
     }
 
@@ -382,11 +376,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         return (address(0), 0);
     }
 
-    function transfer(address to, uint256 amount) external returns (bool) {
-        _transfer(_msgSender(), to, amount);
-        return true;
-    }
-
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -394,6 +383,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+
         currentWethContractBalance = IERC20(address(weth)).balanceOf(
             address(this)
         );
@@ -408,24 +398,41 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         super._afterTokenTransfer(from, to, firstTokenId, batchSize);
         console.log("After token transfer");
 
-        // get contract weth balance
+        // check if from address have zero balance, if so, decrease number of holders
+        if (from != address(0) && balanceOf(from) == 0) {
+            tokenHoldersMap.remove(from);
+        }
+        console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
 
-        uint256 contractWethBalance = IERC20(address(weth)).balanceOf(
+        // check if to address have zero balance, if so, increase number of holders
+        if (balanceOf(to) == 1) {
+            tokenHoldersMap.set(to, 0);
+        }
+        console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
+
+        // get the current balance of the contract
+        uint256 wethContractBalance = IERC20(address(weth)).balanceOf(
             address(this)
         );
 
-        //
+        // calculate the difference between the current balance and the previous balance
+        uint256 ethDiff = wethContractBalance - currentWethContractBalance;
 
-        // if contract balance is greater than 0, unwrap weth and send to owner
-        if (contractWethBalance > 0) {
-            //weth.withdraw(contractWethBalance);
-            uint256 contractBalance = address(this).balance;
+        // if the difference is greater than 0, send split the difference between the holders
+        if (ethDiff > 0) {
+            uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
+            console.log("ethPerHolder: %s", ethPerHolder);
 
-            for (uint256 i = 1; i <= mintersCounter; i++) {
-                address minter = minters[i];
-                claimableAmount[minter] += contractBalance / mintersCounter;
+            // loop through the holders and send them their share
+            for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+                address holder = tokenHoldersMap.getKeyAtIndex(i);
+                console.log("holder: %s", holder);
+                claimableAmount[holder] += ethPerHolder;
+                console.log("claimableAmount: %s", claimableAmount[holder]);
             }
         }
+
+        console.log("ethDiff: %s", ethDiff);
     }
 
     function safeTransferFrom(
@@ -456,12 +463,16 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     // function for claim the rewards
     function claimRewards() public {
-        require(is_minter[msg.sender], "You are not a minter");
-        uint256 amount = claimableAmount[msg.sender];
-        require(amount > 0, "You have no rewards to claim");
+        require(
+            tokenHoldersMap.getIndexOfKey(msg.sender) != -1,
+            "You are not a holder"
+        );
+        require(
+            claimableAmount[msg.sender] > 0,
+            "You have no rewards to claim"
+        );
         claimableAmount[msg.sender] = 0;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "Transfer failed.");
+        IERC20(address(weth)).transfer(msg.sender, claimableAmount[msg.sender]);
     }
 
     // function for get eth balance

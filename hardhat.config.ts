@@ -237,7 +237,7 @@ const config: HardhatUserConfig = {
     token: "BNB",
     currency: 'USD',
     gasPrice: 10,
-    enabled: true,
+    enabled: false,
     coinmarketcap: '0caa3779-3cb2-4665-a7d3-652823b53908'
   }
 };
