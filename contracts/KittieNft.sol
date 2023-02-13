@@ -411,7 +411,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         }
         console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
 
-        /*
+        
         // get the current balance of the contract
         uint256 wethContractBalance = IERC20(address(weth)).balanceOf(
             address(this)
@@ -435,7 +435,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         }
 
         console.log("ethDiff: %s", ethDiff);
-        */
+        
     }
 
     function safeTransferFrom(
