@@ -123,7 +123,11 @@ contract KittieNft is
         setBaseURI(_initBaseURI);
     }
 
-    receive() external payable {}
+    receive() external payable {
+        weth.deposit{value: msg.value}();
+        //updateRewards();
+        //currentWethBalance = IERC20(address(weth)).balanceOf(address(this));
+    }
 
     // GETTERS
     function getClaimableAmount(address _account)
@@ -132,11 +136,6 @@ contract KittieNft is
         returns (uint256)
     {
         return tokenHoldersMap.get(_account);
-    }
-
-    // function for get eth balance
-    function getBalance() public view returns (uint256) {
-        return address(this).balance;
     }
 
     // function for get weth balance
@@ -166,6 +165,14 @@ contract KittieNft is
     // function for set merkle root L2
     function setMerkleRootL2(bytes32 _merkleRootL2) public onlyOwner {
         merkleRootL2 = _merkleRootL2;
+    }
+
+    function setMerkleRootL1Time(uint256 _merkleRootL1Time) public onlyOwner {
+        merkleRootL1Time = _merkleRootL1Time;
+    }
+
+    function setMerkleRootL2Time(uint256 _merkleRootL2Time) public onlyOwner {
+        merkleRootL2Time = _merkleRootL2Time;
     }
 
     function tokenURI(uint256 tokenId)

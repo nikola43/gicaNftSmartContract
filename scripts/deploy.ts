@@ -91,18 +91,18 @@ async function main() {
     kittieNft = await contractFactory.deploy(
         1,
         20,
-        parseEther("0.1"), // _cost
+        parseEther("0.03"), // _cost
         100, // _maxSupply
         "KittieNft", // _name
         "KTNFT", // _symbol
         "https://api.kitties.com/kitties/", // _initBaseURI
     ) as KittieNft;
     await kittieNft.deployed()
-    await test_util.sleep(60);
     console.log(colors.cyan('Contract Address: ') + colors.yellow(kittieNft.address));
     console.log(colors.yellow('verifying...'));
+    await test_util.sleep(60);
     await test_util.updateABI(contractName)
-    await test_util.verify(kittieNft.address, contractName, [1, 20, parseEther("0.1"), 100, "KittieNft", "KTNFT", "https://api.kitties.com/kitties/"])
+    await test_util.verify(kittieNft.address, contractName, [1, 20, parseEther("0.03"), 100, "KittieNft", "KTNFT", "https://api.kitties.com/kitties/"])
 }
 
 main()

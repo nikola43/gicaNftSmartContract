@@ -57,3 +57,6 @@ npx hardhat test test/TestAll.test.ts --network localhost
 ```
 
 nodemon --watch test/TestZoeToken.test.ts --exec 'npx hardhat test test/TestZoeToken.test.ts --network localhost'
+
+root1 6729923340d535ba4641b7802e487e76b9d278dfd9e0ee1a8d8817a2b4dcd73a
+root2 377301edd9ca8cbf23adc76898ea14efadcafdc59ddb3e09b81c4dc27e31de79
