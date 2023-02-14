@@ -3,7 +3,10 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 // import ERC20
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -47,31 +50,28 @@ interface IWETH {
     ) external returns (bool);
 }
 
-contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
+contract KittieNft is
+    ERC721,
+    ERC721Enumerable,
+    ERC721URIStorage,
+    ERC721Burnable,
+    Ownable,
+    RoyaltiesV2Impl
+{
     using Strings for uint256;
     using IterableMapping for IterableMapping.Map;
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIdCounter;
+
     IWETH public weth;
     uint8 public nftType;
     uint8 public discountPercentage;
 
     string public baseURI;
-    string public baseExtension;
 
     //set the cost to mint each NFT
     uint256 public cost;
-
-    //set the max supply of NFT's
-    uint256 public maxSupply;
-
-    //is the contract paused from minting an NFT
-    bool public paused;
-
-    //are the NFT's revealed (viewable)? If true users can see the NFTs.
-    //if false everyone sees a reveal picture
-    bool public revealed;
-
-    //the uri of the not revealed picture
-    string public notRevealedUri;
 
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
@@ -91,40 +91,25 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
     uint256 public currentWethBalance;
 
+    uint256 public maxSupply;
+
     constructor(
         uint8 _nftType,
         uint8 _discountPercentage,
-        string memory _newBaseURI,
         uint256 _cost,
         uint256 _maxSupply,
         string memory _name,
         string memory _symbol,
-        string memory _initBaseURI,
-        string memory _initNotRevealedUri
+        string memory _initBaseURI
     ) ERC721(_name, _symbol) {
         //weth = IWETH(0x5B67676a984807a212b1c59eBFc9B3568a474F0a); // mumbai
         //configuration
         weth = IWETH(0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6);
         nftType = _nftType;
         discountPercentage = _discountPercentage;
-        baseURI = _newBaseURI;
-        baseExtension = ".json";
 
         //set the cost to mint each NFT
         cost = _cost;
-
-        //set the max supply of NFT's
-        maxSupply = _maxSupply;
-
-        //is the contract paused from minting an NFT
-        paused = false;
-
-        //are the NFT's revealed (viewable)? If true users can see the NFTs.
-        //if false everyone sees a reveal picture
-        revealed = true;
-
-        //the uri of the not revealed picture
-        notRevealedUri = "";
 
         deployedTimestamp = block.timestamp;
 
@@ -133,29 +118,30 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
         currentWethBalance = 0;
 
+        maxSupply = _maxSupply;
+
         setBaseURI(_initBaseURI);
-        setNotRevealedURI(_initNotRevealedUri);
     }
 
-    receive() external payable {
-        /*
-        console.log("Received Ether: %s", msg.value);
-        // loop through the minters and add them to the claimable amount
-        for (uint256 i = 1; i <= mintersCounter; i++) {
-            address minter = minters[i];
-            claimableAmount[minter] += msg.value / mintersCounter;
-        }
-        */
+    receive() external payable {}
+
+    // GETTERS
+    function getClaimableAmount(address _account)
+        public
+        view
+        returns (uint256)
+    {
+        return tokenHoldersMap.get(_account);
     }
 
-    // function for set merkle root L1
-    function setMerkleRootL1(bytes32 _merkleRootL1) public onlyOwner {
-        merkleRootL1 = _merkleRootL1;
+    // function for get eth balance
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
     }
 
-    // function for set merkle root L2
-    function setMerkleRootL2(bytes32 _merkleRootL2) public onlyOwner {
-        merkleRootL2 = _merkleRootL2;
+    // function for get weth balance
+    function getWethBalance() public view returns (uint256) {
+        return IERC20(address(weth)).balanceOf(address(this));
     }
 
     function isAccountOnList(
@@ -169,6 +155,42 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
                 merkleRoot,
                 keccak256(abi.encodePacked(account))
             );
+    }
+
+    // SETTERS
+    // function for set merkle root L1
+    function setMerkleRootL1(bytes32 _merkleRootL1) public onlyOwner {
+        merkleRootL1 = _merkleRootL1;
+    }
+
+    // function for set merkle root L2
+    function setMerkleRootL2(bytes32 _merkleRootL2) public onlyOwner {
+        merkleRootL2 = _merkleRootL2;
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function _burn(uint256 tokenId)
+        internal
+        override(ERC721, ERC721URIStorage)
+    {
+        super._burn(tokenId);
     }
 
     function getNumberOfTokenHolders() external view returns (uint256) {
@@ -198,13 +220,7 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         bytes32[] calldata merkleProofL1,
         bytes32[] calldata merkleProofL2
     ) public payable {
-        uint256 supply = totalSupply();
-        require(!paused, "Sale paused");
         require(_mintAmount > 0, "Can't mint 0 tokens");
-        require(
-            supply + _mintAmount <= maxSupply,
-            "Purchase would exceed max supply"
-        );
 
         uint256 requiredEthAmount = calculateMintingCost(
             msg.sender,
@@ -221,10 +237,14 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
             sendToOwner(msg.value);
         }
 
-        for (uint256 i = 1; i <= _mintAmount; i++) {
-            uint256 tokenId = supply + i;
+        for (uint256 i = 0; i < _mintAmount; i++) {
+            uint256 tokenId = _tokenIdCounter.current();
+            _tokenIdCounter.increment();
             _safeMint(msg.sender, tokenId);
-            // set the royalties for the NFT
+            string memory uri = string(
+                abi.encodePacked(baseURI, tokenId.toString(), ".json")
+            );
+            _setTokenURI(tokenId, uri);
             setRoyalties(tokenId, payable(address(this)), 1000);
         }
     }
@@ -272,63 +292,14 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         return tokenIds;
     }
 
-    //input a NFT token ID and get the IPFS URI
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (string memory)
-    {
-        require(_exists(tokenId), "ERC721Metadata: URI nonexistent");
-
-        if (revealed == false) {
-            return notRevealedUri;
-        }
-
-        string memory currentBaseURI = _baseURI();
-        return
-            bytes(currentBaseURI).length > 0
-                ? string(
-                    abi.encodePacked(
-                        currentBaseURI,
-                        tokenId.toString(),
-                        baseExtension
-                    )
-                )
-                : "";
-    }
-
-    //only owner
-    function reveal() public onlyOwner {
-        revealed = true;
-    }
-
     //set the cost of an NFT
     function setCost(uint256 _newCost) public onlyOwner {
         cost = _newCost;
     }
 
-    //set the not revealed URI on IPFS
-    function setNotRevealedURI(string memory _notRevealedURI) public onlyOwner {
-        notRevealedUri = _notRevealedURI;
-    }
-
     //set the base URI on IPFS
     function setBaseURI(string memory _newBaseURI) public onlyOwner {
         baseURI = _newBaseURI;
-    }
-
-    function setBaseExtension(string memory _newBaseExtension)
-        public
-        onlyOwner
-    {
-        baseExtension = _newBaseExtension;
-    }
-
-    //pause the contract and do not allow any more minting
-    function pause(bool _state) public onlyOwner {
-        paused = _state;
     }
 
     function sendToOwner(uint256 _value) internal {
@@ -365,15 +336,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         return (address(0), 0);
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId,
-        uint256 batchSize
-    ) internal override(ERC721, ERC721Enumerable) {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
-    }
-
     function _afterTokenTransfer(
         address from,
         address to,
@@ -381,27 +343,16 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 batchSize
     ) internal virtual override {
         super._afterTokenTransfer(from, to, firstTokenId, batchSize);
-        console.log("After token transfer");
 
         // check if from address have zero balance, if so, decrease number of holders
         if (from != address(0) && balanceOf(from) == 0) {
             tokenHoldersMap.remove(from);
         }
-        console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
 
         // check if to address have zero balance, if so, increase number of holders
         if (balanceOf(to) == 1) {
             tokenHoldersMap.set(to, 0);
         }
-        console.log("holdersCounter: %s", tokenHoldersMap.keys.length);
-    }
-
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public virtual override(ERC721, IERC721) {
-        super.safeTransferFrom(from, to, tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -427,37 +378,32 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
         uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
 
         // check if the contract has any eth, if so, update currentWethContractBalance
-        if (wethBalance > 0) {
-            // check if the contract balance has changed and is greater than the previous balance
-            if (
-                wethBalance != currentWethBalance &&
-                wethBalance > currentWethBalance
-            ) {
-                console.log("wethContractBalance: %s", wethBalance);
-                console.log("currentWethBalance: %s", currentWethBalance);
+        if (
+            wethBalance > 0 && // check if the contract has any eth
+            wethBalance != currentWethBalance && // check if the contract balance has changed
+            wethBalance > currentWethBalance // check if the contract balance has increased
+        ) {
+            uint256 ethDiff = wethBalance - currentWethBalance;
+            console.log("wethContractBalance: %s", wethBalance);
+            console.log("currentWethBalance: %s", currentWethBalance);
+            console.log("ethDiff: %s", ethDiff);
 
-                // calculate the difference between the current balance and the previous balance
-                uint256 ethDiff = wethBalance - currentWethBalance;
-                console.log("ethDiff: %s", ethDiff);
+            // if the difference is greater than 0, send split the difference between the holders
+            if (ethDiff > 0) {
+                uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
+                console.log("ethPerHolder: %s", ethPerHolder);
 
-                // if the difference is greater than 0, send split the difference between the holders
-                if (ethDiff > 0) {
-                    uint256 ethPerHolder = ethDiff /
-                        tokenHoldersMap.keys.length;
-                    console.log("ethPerHolder: %s", ethPerHolder);
+                // loop through the holders and send them their share
+                for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+                    address holder = tokenHoldersMap.getKeyAtIndex(i);
+                    uint256 holderEth = tokenHoldersMap.get(holder);
+                    tokenHoldersMap.set(holder, ethPerHolder + holderEth);
 
-                    // loop through the holders and send them their share
-                    for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
-                        address holder = tokenHoldersMap.getKeyAtIndex(i);
-                        uint256 holderEth = tokenHoldersMap.get(holder);
-                        tokenHoldersMap.set(holder, ethPerHolder + holderEth);
-
-                        console.log("holder: %s", holder);
-                        console.log(
-                            "claimableAmount: %s",
-                            tokenHoldersMap.get(holder)
-                        );
-                    }
+                    console.log("holder: %s", holder);
+                    console.log(
+                        "claimableAmount: %s",
+                        tokenHoldersMap.get(holder)
+                    );
                 }
             }
         }
@@ -486,20 +432,6 @@ contract KittieNft is ERC721, ERC721Enumerable, Ownable, RoyaltiesV2Impl {
 
         // send the claimable amount to the sender
         IERC20(address(weth)).transfer(msg.sender, claimable);
-    }
-
-    function claimableAmount(address _account) public view returns (uint256) {
-        return tokenHoldersMap.get(_account);
-    }
-
-    // function for get eth balance
-    function getBalance() public view returns (uint256) {
-        return address(this).balance;
-    }
-
-    // function for get weth balance
-    function getWethBalance() public view returns (uint256) {
-        return IERC20(address(weth)).balanceOf(address(this));
     }
 
     // function for withdraw weth from contract

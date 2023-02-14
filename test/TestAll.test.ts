@@ -69,13 +69,11 @@ describe("Token contract", async () => {
         kittieNft = await KittieNftFactory.deploy(
             1,
             20,
-            "https://api.kitties.com/kitties/", // _newBaseURI
             parseEther("0.1"), // _cost
             100, // _maxSupply
             "KittieNft", // _name
             "KTNFT", // _symbol
             "https://api.kitties.com/kitties/", // _initBaseURI
-            "https://api.kitties.com/kitties/" // _initNotRevealedUri
         ) as KittieNft;
         await kittieNft.deployed();
 
@@ -236,7 +234,7 @@ describe("Token contract", async () => {
         //expect(balanceBefore).to.equal(parseEther("0"));
 
         // get claimable amount
-        const claimableAmountBefore = await kittieNft.claimableAmount(bob.address);
+        const claimableAmountBefore = await kittieNft.getClaimableAmount(bob.address);
         console.log(`${colors.cyan('Claimable Amount Before Claim')}: ${colors.yellow(formatEther(claimableAmountBefore))}`)
         //expect(claimableAmountBefore).to.equal(parseEther("0"));
 
@@ -245,7 +243,7 @@ describe("Token contract", async () => {
 
         // get claimable amount
         const balanceBefore = await WETH.balanceOf(bob.address);
-        const claimableAmountBefore = await kittieNft.claimableAmount(bob.address);
+        const claimableAmountBefore = await kittieNft.getClaimableAmount(bob.address);
         console.log(`${colors.cyan('Balance Before Claim')}: ${colors.yellow(formatEther(balanceBefore))}`)
         console.log(`${colors.cyan('Claimable Amount Before Claim')}: ${colors.yellow(formatEther(claimableAmountBefore))}`)
     });
@@ -265,9 +263,9 @@ describe("Token contract", async () => {
         //expect(aliceBalanceBefore).to.equal(parseEther("0"));
 
         // get claimable amount
-        const deployerClaimableAmountBefore = await kittieNft.claimableAmount(deployer.address);
-        const bobClaimableAmountBefore = await kittieNft.claimableAmount(bob.address);
-        const aliceClaimableAmountBefore = await kittieNft.claimableAmount(alice.address);
+        const deployerClaimableAmountBefore = await kittieNft.getClaimableAmount(deployer.address);
+        const bobClaimableAmountBefore = await kittieNft.getClaimableAmount(bob.address);
+        const aliceClaimableAmountBefore = await kittieNft.getClaimableAmount(alice.address);
         console.log(`${colors.cyan('Deployer Claimable Amount Before Claim')}: ${colors.yellow(formatEther(deployerClaimableAmountBefore))}`)
         console.log(`${colors.cyan('Bob Claimable Amount Before Claim')}: ${colors.yellow(formatEther(bobClaimableAmountBefore))}`)
         console.log(`${colors.cyan('Alice Claimable Amount Before Claim')}: ${colors.yellow(formatEther(aliceClaimableAmountBefore))}`)
@@ -276,9 +274,9 @@ describe("Token contract", async () => {
         await kittieNft.connect(bob).claimRewards();
 
         // get claimable amount after claim
-        const deployerClaimableAmountAfter = await kittieNft.claimableAmount(deployer.address);
-        const bobClaimableAmountAfter = await kittieNft.claimableAmount(bob.address);
-        const aliceClaimableAmountAfter = await kittieNft.claimableAmount(alice.address);
+        const deployerClaimableAmountAfter = await kittieNft.getClaimableAmount(deployer.address);
+        const bobClaimableAmountAfter = await kittieNft.getClaimableAmount(bob.address);
+        const aliceClaimableAmountAfter = await kittieNft.getClaimableAmount(alice.address);
         console.log(`${colors.cyan('Deployer Claimable Amount After Claim')}: ${colors.yellow(formatEther(deployerClaimableAmountAfter))}`)
         console.log(`${colors.cyan('Bob Claimable Amount After Claim')}: ${colors.yellow(formatEther(bobClaimableAmountAfter))}`)
         console.log(`${colors.cyan('Alice Claimable Amount After Claim')}: ${colors.yellow(formatEther(aliceClaimableAmountAfter))}`)
@@ -309,9 +307,9 @@ describe("Token contract", async () => {
         //expect(aliceBalanceBefore).to.equal(parseEther("0"));
 
         // get claimable amount
-        const deployerClaimableAmountBefore = await kittieNft.claimableAmount(deployer.address);
-        const bobClaimableAmountBefore = await kittieNft.claimableAmount(bob.address);
-        const aliceClaimableAmountBefore = await kittieNft.claimableAmount(alice.address);
+        const deployerClaimableAmountBefore = await kittieNft.getClaimableAmount(deployer.address);
+        const bobClaimableAmountBefore = await kittieNft.getClaimableAmount(bob.address);
+        const aliceClaimableAmountBefore = await kittieNft.getClaimableAmount(alice.address);
         console.log(`${colors.cyan('Deployer Claimable Amount Before Claim')}: ${colors.yellow(formatEther(deployerClaimableAmountBefore))}`)
         console.log(`${colors.cyan('Bob Claimable Amount Before Claim')}: ${colors.yellow(formatEther(bobClaimableAmountBefore))}`)
         console.log(`${colors.cyan('Alice Claimable Amount Before Claim')}: ${colors.yellow(formatEther(aliceClaimableAmountBefore))}`)
@@ -320,9 +318,9 @@ describe("Token contract", async () => {
         await kittieNft.connect(alice).claimRewards();
 
         // get claimable amount after claim
-        const deployerClaimableAmountAfter = await kittieNft.claimableAmount(deployer.address);
-        const bobClaimableAmountAfter = await kittieNft.claimableAmount(bob.address);
-        const aliceClaimableAmountAfter = await kittieNft.claimableAmount(alice.address);
+        const deployerClaimableAmountAfter = await kittieNft.getClaimableAmount(deployer.address);
+        const bobClaimableAmountAfter = await kittieNft.getClaimableAmount(bob.address);
+        const aliceClaimableAmountAfter = await kittieNft.getClaimableAmount(alice.address);
         console.log(`${colors.cyan('Deployer Claimable Amount After Claim')}: ${colors.yellow(formatEther(deployerClaimableAmountAfter))}`)
         console.log(`${colors.cyan('Bob Claimable Amount After Claim')}: ${colors.yellow(formatEther(bobClaimableAmountAfter))}`)
         console.log(`${colors.cyan('Alice Claimable Amount After Claim')}: ${colors.yellow(formatEther(aliceClaimableAmountAfter))}`)
@@ -351,14 +349,14 @@ describe("Token contract", async () => {
     /*
     it("8. Claim", async () => {
         const balanceBefore = await ethers.provider.getBalance(deployer.address);
-        const claimableAmountBefore = await kittieNft.claimableAmount(deployer.address);
+        const claimableAmountBefore = await kittieNft.getClaimableAmount(deployer.address);
         console.log(`${colors.cyan('Balance Before Claim')}: ${colors.yellow(formatEther(balanceBefore))}`)
         console.log(`${colors.cyan('Claimable Amount Before Claim')}: ${colors.yellow(formatEther(claimableAmountBefore))}`)
 
         await kittieNft.claimRewards();
 
         const balanceAfter = await ethers.provider.getBalance(deployer.address);
-        const claimableAmount = await kittieNft.claimableAmount(deployer.address);
+        const claimableAmount = await kittieNft.getClaimableAmount(deployer.address);
         console.log(`${colors.cyan('Balance After Claim')}: ${colors.yellow(formatEther(balanceAfter))}`)
         console.log(`${colors.cyan('Claimable Amount After Claim')}: ${colors.yellow(formatEther(claimableAmount))}`)
     });
