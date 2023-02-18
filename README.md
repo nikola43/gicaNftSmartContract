@@ -60,3 +60,11 @@ nodemon --watch test/TestZoeToken.test.ts --exec 'npx hardhat test test/TestZoeT
 
 root1 6729923340d535ba4641b7802e487e76b9d278dfd9e0ee1a8d8817a2b4dcd73a
 root2 377301edd9ca8cbf23adc76898ea14efadcafdc59ddb3e09b81c4dc27e31de79
+
+{
+  IterableMapping: '0x468407885E639063D7F85921B752AB4CDe1948Bf',
+  KittieNft1: '0xbDdd7097B50813b46604E291Ef57473c4B661f94',
+  KittieNft2: '0x3702D35FC086CC0d521003d8Be0b4E7d66a469Fd',
+  KittieNft3: '0x151FeE83C6EBbd4a8a655D10afcc7268599A33f4',
+  NftManager: '0x4689a2701c78183Cb63c864Aca155dcc1d598937'
+}

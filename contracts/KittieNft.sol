@@ -29,12 +29,6 @@ import "hardhat/console.sol";
 // import IterableMapping for store holders addresses
 import "./IterableMapping.sol";
 
-/*
-1.) Type#1 - 10k pieces – 100% - 0,03 ETH 
-2.) Type#2 - 20k pieces – 60% - 0,015 ETH 
-3.) Type#3 - 30k pieces – 30% - 0,005 ETH
-*/
-
 // interface for weth
 interface IWETH {
     function deposit() external payable;
@@ -63,6 +57,7 @@ contract KittieNft is
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
+    mapping(address => bool) private minters;
 
     IWETH public weth;
     uint8 public nftType;
@@ -104,6 +99,7 @@ contract KittieNft is
     ) ERC721(_name, _symbol) {
         //weth = IWETH(0x5B67676a984807a212b1c59eBFc9B3568a474F0a); // mumbai
         //configuration
+
         weth = IWETH(0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6);
         nftType = _nftType;
         discountPercentage = _discountPercentage;
@@ -113,8 +109,8 @@ contract KittieNft is
 
         deployedTimestamp = block.timestamp;
 
-        merkleRootL1Time = 6 * 30 days;
-        merkleRootL2Time = 6 * 30 days;
+        merkleRootL1Time = 12 hours; // todo change to 6 months
+        merkleRootL2Time = 12 hours; // todo change to 6 months
 
         currentWethBalance = 0;
 
@@ -125,13 +121,12 @@ contract KittieNft is
 
     receive() external payable {
         weth.deposit{value: msg.value}();
-        //updateRewards();
-        //currentWethBalance = IERC20(address(weth)).balanceOf(address(this));
+        updateRewards();
     }
 
     // GETTERS
     function getClaimableAmount(address _account)
-        public
+        external
         view
         returns (uint256)
     {
@@ -223,14 +218,15 @@ contract KittieNft is
 
     //function allows you to mint an NFT token
     function mint(
+        address account,
         uint256 _mintAmount,
         bytes32[] calldata merkleProofL1,
         bytes32[] calldata merkleProofL2
-    ) public payable {
+    ) external payable {
         require(_mintAmount > 0, "Can't mint 0 tokens");
 
-        uint256 requiredEthAmount = calculateMintingCost(
-            msg.sender,
+        uint256 requiredEthAmount = this.calculateMintingCost(
+            account,
             _mintAmount,
             merkleProofL1,
             merkleProofL2
@@ -246,14 +242,15 @@ contract KittieNft is
 
         for (uint256 i = 0; i < _mintAmount; i++) {
             uint256 tokenId = _tokenIdCounter.current();
-            _tokenIdCounter.increment();
-            _safeMint(msg.sender, tokenId);
+            _safeMint(account, tokenId);
             string memory uri = string(
                 abi.encodePacked(baseURI, tokenId.toString(), ".json")
             );
             _setTokenURI(tokenId, uri);
             setRoyalties(tokenId, payable(address(this)), 1000);
+            _tokenIdCounter.increment();
         }
+        minters[account] = true;
     }
 
     function calculateMintingCost(
@@ -261,9 +258,10 @@ contract KittieNft is
         uint256 _mintAmount,
         bytes32[] calldata merkleProofL1,
         bytes32[] calldata merkleProofL2
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         //  We need to make sure that for the first Wallet list, minting is free for the first 6 months, after which they will have to pay for it.
         if (
+            !minters[account] &&
             isAccountOnList(account, merkleProofL1, merkleRootL1) &&
             getElapsedTime(deployedTimestamp, block.timestamp) <=
             merkleRootL1Time
@@ -273,6 +271,7 @@ contract KittieNft is
 
         // The second list of wallets will have to wait 6 months, after which they too will be able to mint for free for 6 months
         if (
+            !minters[account] &&
             isAccountOnList(account, merkleProofL2, merkleRootL2) &&
             getElapsedTime(deployedTimestamp, block.timestamp) >=
             merkleRootL2Time &&
@@ -310,7 +309,7 @@ contract KittieNft is
     }
 
     function sendToOwner(uint256 _value) internal {
-        (bool success, ) = payable(msg.sender).call{value: _value}("");
+        (bool success, ) = payable(owner()).call{value: _value}("");
         require(success, "Transfer failed.");
     }
 
@@ -357,9 +356,12 @@ contract KittieNft is
         }
 
         // check if to address have zero balance, if so, increase number of holders
-        if (balanceOf(to) == 1) {
+        if (to != address(0) && balanceOf(to) == 1) {
             tokenHoldersMap.set(to, 0);
         }
+
+        //updateRewards();
+        //currentWethBalance = IERC20(address(weth)).balanceOf(address(this));
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -412,25 +414,28 @@ contract KittieNft is
                         tokenHoldersMap.get(holder)
                     );
                 }
+                currentWethBalance = IERC20(address(weth)).balanceOf(
+                    address(this)
+                );
             }
         }
     }
 
     // function for claim the rewards
-    function claimRewards() public {
+    function claimRewards(address account) external {
         updateRewards();
 
         require(
-            tokenHoldersMap.getIndexOfKey(msg.sender) != -1,
+            tokenHoldersMap.getIndexOfKey(account) != -1,
             "You are not a holder"
         );
 
         // get claimable amount for the sender
-        uint256 claimable = tokenHoldersMap.get(msg.sender);
+        uint256 claimable = tokenHoldersMap.get(account);
         require(claimable > 0, "You have no rewards to claim");
 
         // reset the claimable amount for the sender
-        tokenHoldersMap.set(msg.sender, 0);
+        tokenHoldersMap.set(account, 0);
 
         // update the current balance of the contract
         currentWethBalance =
@@ -438,22 +443,22 @@ contract KittieNft is
             claimable;
 
         // send the claimable amount to the sender
-        IERC20(address(weth)).transfer(msg.sender, claimable);
+        IERC20(address(weth)).transfer(account, claimable);
     }
 
     // function for withdraw weth from contract
     function withdrawWeth() public onlyOwner {
         IERC20(address(weth)).transfer(
-            msg.sender,
+            owner(),
             IERC20(address(weth)).balanceOf(address(this))
         );
     }
 
     // function for withdraw eth from contract
     function withdrawEth() public onlyOwner {
-        (bool success, ) = payable(msg.sender).call{
-            value: address(this).balance
-        }("");
+        (bool success, ) = payable(owner()).call{value: address(this).balance}(
+            ""
+        );
         require(success, "Transfer failed.");
     }
 
