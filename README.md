@@ -68,3 +68,4 @@ root2 377301edd9ca8cbf23adc76898ea14efadcafdc59ddb3e09b81c4dc27e31de79
   KittieNft3: '0x151FeE83C6EBbd4a8a655D10afcc7268599A33f4',
   NftManager: '0x4689a2701c78183Cb63c864Aca155dcc1d598937'
 }
+

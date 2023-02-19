@@ -84,7 +84,7 @@ contract KittieNft is
     // deployed timestamp
     uint256 public deployedTimestamp;
 
-    uint256 public currentWethBalance;
+    uint256 public lastWethBalance;
 
     uint256 public maxSupply;
 
@@ -112,7 +112,7 @@ contract KittieNft is
         merkleRootL1Time = 12 hours; // todo change to 6 months
         merkleRootL2Time = 12 hours; // todo change to 6 months
 
-        currentWethBalance = 0;
+        lastWethBalance = 0;
 
         maxSupply = _maxSupply;
 
@@ -121,7 +121,6 @@ contract KittieNft is
 
     receive() external payable {
         weth.deposit{value: msg.value}();
-        updateRewards();
     }
 
     // GETTERS
@@ -359,9 +358,6 @@ contract KittieNft is
         if (to != address(0) && balanceOf(to) == 1) {
             tokenHoldersMap.set(to, 0);
         }
-
-        //updateRewards();
-        //currentWethBalance = IERC20(address(weth)).balanceOf(address(this));
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -382,42 +378,57 @@ contract KittieNft is
         return super.supportsInterface(interfaceId);
     }
 
+    function calculateClaimableRewards(address account)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 claimable = 0;
+
+        // get the current balance of the contract
+        uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
+
+        // if the contract has more eth, split the difference between the holders
+        if (wethBalance > 0) {
+            uint256 ethPerHolder = wethBalance / tokenHoldersMap.keys.length;
+
+            for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+                address holder = tokenHoldersMap.getKeyAtIndex(i);
+                if (holder == account) {
+                    uint256 holderEth = tokenHoldersMap.get(holder);
+                    claimable = holderEth + ethPerHolder;
+                    break;
+                }
+            }
+        }
+
+        return claimable;
+    }
+
     function updateRewards() public {
         // get the current balance of the contract
         uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
 
-        // check if the contract has any eth, if so, update currentWethContractBalance
-        if (
-            wethBalance > 0 && // check if the contract has any eth
-            wethBalance != currentWethBalance && // check if the contract balance has changed
-            wethBalance > currentWethBalance // check if the contract balance has increased
-        ) {
-            uint256 ethDiff = wethBalance - currentWethBalance;
-            console.log("wethContractBalance: %s", wethBalance);
-            console.log("currentWethBalance: %s", currentWethBalance);
-            console.log("ethDiff: %s", ethDiff);
-
-            // if the difference is greater than 0, send split the difference between the holders
-            if (ethDiff > 0) {
+        // check if contract have more or less eth than the last time we checked
+        if (wethBalance != lastWethBalance) {
+            
+            // if the contract has more eth, split the difference between the holders
+            if (wethBalance > lastWethBalance) {
+                uint256 ethDiff = wethBalance - lastWethBalance;
                 uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
-                console.log("ethPerHolder: %s", ethPerHolder);
 
                 // loop through the holders and send them their share
                 for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
                     address holder = tokenHoldersMap.getKeyAtIndex(i);
                     uint256 holderEth = tokenHoldersMap.get(holder);
                     tokenHoldersMap.set(holder, ethPerHolder + holderEth);
-
                     console.log("holder: %s", holder);
-                    console.log(
-                        "claimableAmount: %s",
-                        tokenHoldersMap.get(holder)
-                    );
+                    console.log("holderBalance: %s", ethPerHolder + holderEth);
                 }
-                currentWethBalance = IERC20(address(weth)).balanceOf(
-                    address(this)
-                );
             }
+
+            // update the last balance of the contract
+            lastWethBalance = wethBalance;
         }
     }
 
@@ -438,9 +449,7 @@ contract KittieNft is
         tokenHoldersMap.set(account, 0);
 
         // update the current balance of the contract
-        currentWethBalance =
-            IERC20(address(weth)).balanceOf(address(this)) -
-            claimable;
+        lastWethBalance -= claimable;
 
         // send the claimable amount to the sender
         IERC20(address(weth)).transfer(account, claimable);
@@ -465,5 +474,10 @@ contract KittieNft is
     // function for unwrap weth
     function unwrapWeth(uint256 _amount) public onlyOwner {
         weth.withdraw(_amount);
+    }
+
+    // function for wrap eth
+    function wrapEth(uint256 _amount) public onlyOwner {
+        weth.deposit{value: _amount}();
     }
 }
