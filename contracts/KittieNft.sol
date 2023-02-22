@@ -156,13 +156,13 @@ contract KittieNft is
     function updateRewardsBank() public {
         uint256 wethBalanceChange = getRewardsChange();
         if (wethBalanceChange>0){
-            uint256 tokenId = _tokenIdCounter.current();
+            uint256 tokenId = _tokenIdCounter.current()-1;
             uint256 lastRewardsBankKey = getLastRewardsBankKey();
             // assuming _tokenIdCounter is never decremented
-            if (tokenId > lastRewardsBankKey){
+            if (tokenId > lastRewardsBankKey || tokenId == 0){
                 rewardsBankKeys.push(tokenId);
             }
-            rewardsBank[tokenId] += (wethBalanceChange / tokenId);
+            rewardsBank[tokenId] += (wethBalanceChange / (tokenId+1));
         }
     }
 
@@ -171,7 +171,7 @@ contract KittieNft is
     // reward Calculation is dependent on tokens being minted with incrementing tokenIds and no burns are taking place
     function getTokenAccumulatedRewards(uint256 tokenId) public view returns(uint256 accumulatedRewards) {
         for (uint256 index = rewardsBankKeys.length; index > 0; index--) {
-            uint256 key = rewardsBankKeys[index]-1;
+            uint256 key = rewardsBankKeys[index-1];
             if (key >= tokenId) {
                 accumulatedRewards += rewardsBank[key];
             } else {
