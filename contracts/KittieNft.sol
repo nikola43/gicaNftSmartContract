@@ -70,8 +70,9 @@ contract KittieNft is
 
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
+    // upggrade by @shubhangdev backup
     // mapping for store holders addresses and claimable amount
-    IterableMapping.Map private tokenHoldersMap;
+    // IterableMapping.Map private tokenHoldersMap;
 
     // merkle root for the list 1
     bytes32 public merkleRootL1;
@@ -87,6 +88,14 @@ contract KittieNft is
     uint256 public lastWethBalance;
 
     uint256 public maxSupply;
+
+    // upggrade by @shubhangdev
+    mapping(uint256 => uint256) private rewardsClaimed;
+    mapping(uint256 => uint256) private rewardsBank;
+    uint256[] private rewardsBankKeys;
+    uint256 private lastRewardBalance;
+    
+
 
     constructor(
         uint8 _nftType,
@@ -123,14 +132,88 @@ contract KittieNft is
         weth.deposit{value: msg.value}();
     }
 
-    // GETTERS
-    function getClaimableAmount(address _account)
-        external
-        view
-        returns (uint256)
-    {
-        return tokenHoldersMap.get(_account);
+    // upgrade by @shubhangdev
+    function getRewardsChange() internal returns(uint256 wethBalanceChange){
+        uint256 wethBalance = getWethBalance();
+        if (wethBalance<=lastWethBalance){
+            wethBalanceChange=0;
+            lastWethBalance = wethBalance;
+        } else {
+            wethBalanceChange = wethBalance - lastWethBalance;
+        }
     }
+
+    // upgrade by @shubhangdev
+    function getLastRewardsBankKey() internal view returns(uint256 lastRewardsBankKey) {
+        if (rewardsBankKeys.length == 0){
+            lastRewardsBankKey = 0;
+        } else {
+            lastRewardsBankKey = rewardsBankKeys[rewardsBankKeys.length -1];
+        }
+    }
+
+    // upgrade by @shubhangdev
+    function updateRewardsBank() internal {
+        uint256 wethBalanceChange = getRewardsChange();
+        if (wethBalanceChange>0){
+            uint256 tokenId = _tokenIdCounter.current();
+            uint256 lastRewardsBankKey = getLastRewardsBankKey();
+            // assuming _tokenIdCounter is never decremented
+            if (tokenId > lastRewardsBankKey){
+                rewardsBankKeys.push(tokenId);
+            }
+            rewardsBank[tokenId] += (wethBalanceChange / tokenId);
+        }
+    }
+
+
+    // upgrade by @shubhangdev
+    // reward Calculation is dependent on tokens being minted with incrementing tokenIds and no burns are taking place
+    function getTokenAccumulatedRewards(uint256 tokenId) internal view returns(uint256 accumulatedRewards) {
+        for (uint256 index = rewardsBankKeys.length-1; index >= 0; index--) {
+            uint256 key = rewardsBankKeys[index];
+            if (key >= tokenId) {
+                accumulatedRewards += rewardsBank[key];
+            } else {
+                return accumulatedRewards;
+            }
+        }
+    }
+
+    // upgrade by @shubhangdev
+    // this function is to be called as view on the frontend to get claimable rewards
+    function getClaimableRewards(uint256 tokenId) public returns(uint256 claimableRewards) {
+        updateRewardsBank();
+        uint256 accumulatedRewards = getTokenAccumulatedRewards(tokenId);
+        claimableRewards = accumulatedRewards - rewardsClaimed[tokenId];
+        
+    }
+
+    // upgrade by @shubhangdev  
+    // function can be called by anyone but rewards are dispatched to owner only
+    // on the frontend fetch tokens owned by the owner and call the claim function multiple times accordingly
+    function claimRewards(uint256 tokenId) public returns(uint256 claimableRewards) {
+        claimableRewards = getClaimableRewards(tokenId);
+        address tokenOwner = ownerOf(tokenId);
+        rewardsClaimed[tokenId] += claimableRewards;
+        IERC20(address(weth)).transfer(tokenOwner, claimableRewards);
+        getRewardsChange();
+    }
+
+
+
+    
+
+
+    // upgrade by @shubhangdev backup
+    // GETTERS
+    // function getClaimableAmount(address _account)
+    //     external
+    //     view
+    //     returns (uint256)
+    // {
+    //     return tokenHoldersMap.get(_account);
+    // }
 
     // function for get weth balance
     function getWethBalance() public view returns (uint256) {
@@ -194,9 +277,11 @@ contract KittieNft is
         super._burn(tokenId);
     }
 
-    function getNumberOfTokenHolders() external view returns (uint256) {
-        return tokenHoldersMap.keys.length;
-    }
+    // upgrade by @shubhangdev backup
+
+    // function getNumberOfTokenHolders() external view returns (uint256) {
+    //     return tokenHoldersMap.keys.length;
+    // }
 
     // function for get elapsed time between two timestamps
     function getElapsedTime(uint256 _startTime, uint256 _endTime)
@@ -341,6 +426,7 @@ contract KittieNft is
         return (address(0), 0);
     }
 
+    // upgrade by @shubhangdev upgrade
     function _afterTokenTransfer(
         address from,
         address to,
@@ -348,16 +434,17 @@ contract KittieNft is
         uint256 batchSize
     ) internal virtual override {
         super._afterTokenTransfer(from, to, firstTokenId, batchSize);
+        updateRewardsBank();
 
-        // check if from address have zero balance, if so, decrease number of holders
-        if (from != address(0) && balanceOf(from) == 0) {
-            tokenHoldersMap.remove(from);
-        }
+        // // check if from address have zero balance, if so, decrease number of holders
+        // if (from != address(0) && balanceOf(from) == 0) {
+        //     tokenHoldersMap.remove(from);
+        // }
 
-        // check if to address have zero balance, if so, increase number of holders
-        if (to != address(0) && balanceOf(to) == 1) {
-            tokenHoldersMap.set(to, 0);
-        }
+        // // check if to address have zero balance, if so, increase number of holders
+        // if (to != address(0) && balanceOf(to) == 1) {
+        //     tokenHoldersMap.set(to, 0);
+        // }
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -378,82 +465,90 @@ contract KittieNft is
         return super.supportsInterface(interfaceId);
     }
 
-    function calculateClaimableRewards(address account)
-        public
-        view
-        returns (uint256)
-    {
-        uint256 claimable = 0;
+    // upgrade by @shubhangdev backup
 
-        // get the current balance of the contract
-        uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
 
-        // if the contract has more eth, split the difference between the holders
-        if (wethBalance > 0) {
-            uint256 ethPerHolder = wethBalance / tokenHoldersMap.keys.length;
+    // function calculateClaimableRewards(address account)
+    //     public
+    //     view
+    //     returns (uint256)
+    // {
+    //     uint256 claimable = 0;
 
-            for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
-                address holder = tokenHoldersMap.getKeyAtIndex(i);
-                if (holder == account) {
-                    uint256 holderEth = tokenHoldersMap.get(holder);
-                    claimable = holderEth + ethPerHolder;
-                    break;
-                }
-            }
-        }
+    //     // get the current balance of the contract
+    //     uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
 
-        return claimable;
-    }
+    //     // if the contract has more eth, split the difference between the holders
+    //     if (wethBalance > 0) {
+    //         uint256 ethPerHolder = wethBalance / tokenHoldersMap.keys.length;
 
-    function updateRewards() public {
-        // get the current balance of the contract
-        uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
+    //         for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+    //             address holder = tokenHoldersMap.getKeyAtIndex(i);
+    //             if (holder == account) {
+    //                 uint256 holderEth = tokenHoldersMap.get(holder);
+    //                 claimable = holderEth + ethPerHolder;
+    //                 break;
+    //             }
+    //         }
+    //     }
 
-        // check if contract have more or less eth than the last time we checked
-        if (wethBalance != lastWethBalance) {
+    //     return claimable;
+    // }
+
+
+    // upgrade by @shubhangdev backup
+
+    // function updateRewards() public {
+    //     // get the current balance of the contract
+    //     uint256 wethBalance = IERC20(address(weth)).balanceOf(address(this));
+
+    //     // check if contract have more or less eth than the last time we checked
+    //     if (wethBalance != lastWethBalance) {
             
-            // if the contract has more eth, split the difference between the holders
-            if (wethBalance > lastWethBalance) {
-                uint256 ethDiff = wethBalance - lastWethBalance;
-                uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
+    //         // if the contract has more eth, split the difference between the holders
+    //         if (wethBalance > lastWethBalance) {
+    //             uint256 ethDiff = wethBalance - lastWethBalance;
+    //             uint256 ethPerHolder = ethDiff / tokenHoldersMap.keys.length;
 
-                // loop through the holders and send them their share
-                for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
-                    address holder = tokenHoldersMap.getKeyAtIndex(i);
-                    uint256 holderEth = tokenHoldersMap.get(holder);
-                    tokenHoldersMap.set(holder, ethPerHolder + holderEth);
-                    console.log("holder: %s", holder);
-                    console.log("holderBalance: %s", ethPerHolder + holderEth);
-                }
-            }
+    //             // loop through the holders and send them their share
+    //             for (uint256 i = 0; i < tokenHoldersMap.keys.length; i++) {
+    //                 address holder = tokenHoldersMap.getKeyAtIndex(i);
+    //                 uint256 holderEth = tokenHoldersMap.get(holder);
+    //                 tokenHoldersMap.set(holder, ethPerHolder + holderEth);
+    //                 console.log("holder: %s", holder);
+    //                 console.log("holderBalance: %s", ethPerHolder + holderEth);
+    //             }
+    //         }
 
-            // update the last balance of the contract
-            lastWethBalance = wethBalance;
-        }
-    }
+    //         // update the last balance of the contract
+    //         lastWethBalance = wethBalance;
+    //     }
+    // }
 
-    // function for claim the rewards
-    function claimRewards(address account) external {
-        updateRewards();
 
-        require(
-            tokenHoldersMap.getIndexOfKey(account) != -1,
-            "You are not a holder"
-        );
+    // upgrade by @shubhangdev backup
+    // // function for claim the rewards
+    // function claimRewards(address account) external {
+    //     updateRewards();
 
-        // get claimable amount for the sender
-        uint256 claimable = tokenHoldersMap.get(account);
-        require(claimable > 0, "You have no rewards to claim");
+    //     require(
+    //         tokenHoldersMap.getIndexOfKey(account) != -1,
+    //         "You are not a holder"
+    //     );
 
-        // reset the claimable amount for the sender
-        tokenHoldersMap.set(account, 0);
+    //     // get claimable amount for the sender
+    //     uint256 claimable = tokenHoldersMap.get(account);
+    //     require(claimable > 0, "You have no rewards to claim");
 
-        // update the current balance of the contract
-        lastWethBalance -= claimable;
+    //     // reset the claimable amount for the sender
+    //     tokenHoldersMap.set(account, 0);
 
-        // send the claimable amount to the sender
-        IERC20(address(weth)).transfer(account, claimable);
-    }
+    //     // update the current balance of the contract
+    //     lastWethBalance -= claimable;
+
+    //     // send the claimable amount to the sender
+    //     IERC20(address(weth)).transfer(account, claimable);
+    // }
 
     // function for withdraw weth from contract
     function withdrawWeth() public onlyOwner {
