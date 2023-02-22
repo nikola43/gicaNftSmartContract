@@ -70,24 +70,12 @@ async function main() {
     /// ---------------------------------------------
 
 
-    const iterableMappingFactory = await ethers.getContractFactory("IterableMapping")
-    const IterableMappingDeployed = await iterableMappingFactory.deploy()
-    await IterableMappingDeployed.deployed()
-    console.log({
-        IterableMappingDeployed: IterableMappingDeployed.address
-    })
-    await test_util.sleep(60);
-    await test_util.updateABI("IterableMapping")
-    await test_util.verify(IterableMappingDeployed.address, "IterableMapping")
+
 
     let contractName = "KittieNft"
     console.log(colors.yellow('Deploying ') + colors.cyan(contractName) + colors.yellow('...'));
 
-    const contractFactory = await ethers.getContractFactory(contractName, {
-        libraries: {
-            IterableMapping: IterableMappingDeployed.address
-        },
-    });
+    const contractFactory = await ethers.getContractFactory(contractName);
     kittieNft = await contractFactory.deploy(
         1,
         100,

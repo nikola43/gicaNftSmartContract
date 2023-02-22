@@ -94,8 +94,6 @@ contract KittieNft is
     mapping(uint256 => uint256) private rewardsBank;
     uint256[] private rewardsBankKeys;
     uint256 private lastRewardBalance;
-    
-
 
     constructor(
         uint8 _nftType,
@@ -133,10 +131,10 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function getRewardsChange() internal returns(uint256 wethBalanceChange){
+    function getRewardsChange() internal returns (uint256 wethBalanceChange) {
         uint256 wethBalance = getWethBalance();
-        if (wethBalance<=lastRewardBalance){
-            wethBalanceChange=0;
+        if (wethBalance <= lastRewardBalance) {
+            wethBalanceChange = 0;
             lastRewardBalance = wethBalance;
         } else {
             wethBalanceChange = wethBalance - lastRewardBalance;
@@ -144,34 +142,41 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function getLastRewardsBankKey() internal view returns(uint256 lastRewardsBankKey) {
-        if (rewardsBankKeys.length == 0){
+    function getLastRewardsBankKey()
+        internal
+        view
+        returns (uint256 lastRewardsBankKey)
+    {
+        if (rewardsBankKeys.length == 0) {
             lastRewardsBankKey = 0;
         } else {
-            lastRewardsBankKey = rewardsBankKeys[rewardsBankKeys.length -1];
+            lastRewardsBankKey = rewardsBankKeys[rewardsBankKeys.length - 1];
         }
     }
 
     // upgrade by @shubhangdev
     function updateRewardsBank() internal {
         uint256 wethBalanceChange = getRewardsChange();
-        if (wethBalanceChange>0){
-            uint256 tokenId = _tokenIdCounter.current()-1;
+        if (wethBalanceChange > 0) {
+            uint256 tokenId = _tokenIdCounter.current() - 1;
             uint256 lastRewardsBankKey = getLastRewardsBankKey();
             // assuming _tokenIdCounter is never decremented
-            if (tokenId > lastRewardsBankKey || tokenId == 0){
+            if (tokenId > lastRewardsBankKey || tokenId == 0) {
                 rewardsBankKeys.push(tokenId);
             }
-            rewardsBank[tokenId] += (wethBalanceChange / (tokenId+1));
+            rewardsBank[tokenId] += (wethBalanceChange / (tokenId + 1));
         }
     }
 
-
     // upgrade by @shubhangdev
     // reward Calculation is dependent on tokens being minted with incrementing tokenIds and no burns are taking place
-    function getTokenAccumulatedRewards(uint256 tokenId) internal view returns(uint256 accumulatedRewards) {
+    function getTokenAccumulatedRewards(uint256 tokenId)
+        internal
+        view
+        returns (uint256 accumulatedRewards)
+    {
         for (uint256 index = rewardsBankKeys.length; index > 0; index--) {
-            uint256 key = rewardsBankKeys[index-1];
+            uint256 key = rewardsBankKeys[index - 1];
             if (key >= tokenId) {
                 accumulatedRewards += rewardsBank[key];
             } else {
@@ -182,28 +187,47 @@ contract KittieNft is
 
     // upgrade by @shubhangdev
     // this function is to be called as view on the frontend to get claimable rewards
-    function getClaimableRewards(uint256 tokenId) public returns(uint256 claimableRewards) {
+    function getClaimableRewards(uint256 tokenId)
+        public
+        returns (uint256 claimableRewards)
+    {
         updateRewardsBank();
         uint256 accumulatedRewards = getTokenAccumulatedRewards(tokenId);
         claimableRewards = accumulatedRewards - rewardsClaimed[tokenId];
-        
     }
 
-    // upgrade by @shubhangdev  
+    // upgrade by @shubhangdev
     // function can be called by anyone but rewards are dispatched to owner only
     // on the frontend fetch tokens owned by the owner and call the claim function multiple times accordingly
-    function claimRewards(uint256 tokenId) public returns(uint256 claimableRewards) {
+    function claimRewards(uint256 tokenId)
+        public
+        returns (uint256 claimableRewards)
+    {
         claimableRewards = getClaimableRewards(tokenId);
         address tokenOwner = ownerOf(tokenId);
         rewardsClaimed[tokenId] += claimableRewards;
+        require(claimableRewards > 0, "No rewards to claim");
         IERC20(address(weth)).transfer(tokenOwner, claimableRewards);
         getRewardsChange();
     }
 
+    // upgrade by @shubhangdev
+    // function can be called by anyone but rewards are dispatched to owner only
+    // on the frontend fetch tokens owned by the owner and call the claim function multiple times accordingly
+    function claimAllRewards() public {
+        uint256[] memory ids = walletOfOwner(msg.sender);
+        uint256 totalClaimableRewards = 0;
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 claimableRewards = getClaimableRewards(ids[i]);
+            rewardsClaimed[ids[i]] += claimableRewards;
+            totalClaimableRewards += claimableRewards;
+        }
 
+        require(totalClaimableRewards > 0, "No rewards to claim");
 
-    
-
+        IERC20(address(weth)).transfer(msg.sender, totalClaimableRewards);
+        getRewardsChange();
+    }
 
     // upgrade by @shubhangdev backup
     // GETTERS
@@ -467,7 +491,6 @@ contract KittieNft is
 
     // upgrade by @shubhangdev backup
 
-
     // function calculateClaimableRewards(address account)
     //     public
     //     view
@@ -495,7 +518,6 @@ contract KittieNft is
     //     return claimable;
     // }
 
-
     // upgrade by @shubhangdev backup
 
     // function updateRewards() public {
@@ -504,7 +526,7 @@ contract KittieNft is
 
     //     // check if contract have more or less eth than the last time we checked
     //     if (wethBalance != lastWethBalance) {
-            
+
     //         // if the contract has more eth, split the difference between the holders
     //         if (wethBalance > lastWethBalance) {
     //             uint256 ethDiff = wethBalance - lastWethBalance;
@@ -524,7 +546,6 @@ contract KittieNft is
     //         lastWethBalance = wethBalance;
     //     }
     // }
-
 
     // upgrade by @shubhangdev backup
     // // function for claim the rewards
