@@ -170,8 +170,8 @@ contract KittieNft is
     // upgrade by @shubhangdev
     // reward Calculation is dependent on tokens being minted with incrementing tokenIds and no burns are taking place
     function getTokenAccumulatedRewards(uint256 tokenId) public view returns(uint256 accumulatedRewards) {
-        for (uint256 index = rewardsBankKeys.length-1; index >= 0; index--) {
-            uint256 key = rewardsBankKeys[index];
+        for (uint256 index = rewardsBankKeys.length; index > 0; index--) {
+            uint256 key = rewardsBankKeys[index]-1;
             if (key >= tokenId) {
                 accumulatedRewards += rewardsBank[key];
             } else {
