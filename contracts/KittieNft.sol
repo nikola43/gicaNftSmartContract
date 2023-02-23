@@ -165,6 +165,7 @@ contract KittieNft is
                 rewardsBankKeys.push(tokenId);
             }
             rewardsBank[tokenId] += (wethBalanceChange / (tokenId + 1));
+            getRewardsChange();
         }
     }
 
