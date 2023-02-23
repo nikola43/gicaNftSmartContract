@@ -131,11 +131,10 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function getRewardsChange() public returns (uint256 wethBalanceChange) {
+    function getRewardsChange() public view returns (uint256 wethBalanceChange) {
         uint256 wethBalance = getWethBalance();
         if (wethBalance <= lastRewardBalance) {
             wethBalanceChange = 0;
-            lastRewardBalance = wethBalance;
         } else {
             wethBalanceChange = wethBalance - lastRewardBalance;
         }
@@ -209,8 +208,8 @@ contract KittieNft is
         address tokenOwner = ownerOf(tokenId);
         rewardsClaimed[tokenId] += claimableRewards;
         require(claimableRewards > 0, "No rewards to claim");
+        lastRewardBalance -= claimableRewards;
         IERC20(address(weth)).transfer(tokenOwner, claimableRewards);
-        getRewardsChange();
     }
 
     // upgrade by @shubhangdev
@@ -218,17 +217,9 @@ contract KittieNft is
     // on the frontend fetch tokens owned by the owner and call the claim function multiple times accordingly
     function claimAllRewards() public {
         uint256[] memory ids = walletOfOwner(msg.sender);
-        uint256 totalClaimableRewards = 0;
         for (uint256 i = 0; i < ids.length; i++) {
-            uint256 claimableRewards = getClaimableRewards(ids[i]);
-            rewardsClaimed[ids[i]] += claimableRewards;
-            totalClaimableRewards += claimableRewards;
+            claimRewards(ids[i]);
         }
-
-        require(totalClaimableRewards > 0, "No rewards to claim");
-
-        IERC20(address(weth)).transfer(msg.sender, totalClaimableRewards);
-        getRewardsChange();
     }
 
     // upgrade by @shubhangdev backup
