@@ -90,10 +90,10 @@ contract KittieNft is
     uint256 public maxSupply;
 
     // upggrade by @shubhangdev
-    mapping(uint256 => uint256) public rewardsClaimed;
-    mapping(uint256 => uint256) public rewardsBank;
-    uint256[] public rewardsBankKeys;
-    uint256 public lastRewardBalance;
+    mapping(uint256 => uint256) private rewardsClaimed;
+    mapping(uint256 => uint256) private rewardsBank;
+    uint256[] private rewardsBankKeys;
+    uint256 private lastRewardBalance;
 
     constructor(
         uint8 _nftType,
@@ -131,7 +131,7 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function getRewardsChange() public view returns (uint256 wethBalanceChange) {
+    function getRewardsChange() internal view returns (uint256 wethBalanceChange) {
         uint256 wethBalance = getWethBalance();
         if (wethBalance <= lastRewardBalance) {
             wethBalanceChange = 0;
@@ -142,7 +142,7 @@ contract KittieNft is
 
     // upgrade by @shubhangdev
     function getLastRewardsBankKey()
-        public
+        internal
         view
         returns (uint256 lastRewardsBankKey)
     {
@@ -154,7 +154,7 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function updateRewardsBank() public {
+    function updateRewardsBank() internal {
         uint256 wethBalanceChange = getRewardsChange();
         if (wethBalanceChange > 0) {
             uint256 tokenId = _tokenIdCounter.current() - 1;
@@ -172,7 +172,7 @@ contract KittieNft is
     // upgrade by @shubhangdev
     // reward Calculation is dependent on tokens being minted with incrementing tokenIds and no burns are taking place
     function getTokenAccumulatedRewards(uint256 tokenId)
-        public
+        internal
         view
         returns (uint256 accumulatedRewards)
     {
