@@ -41,9 +41,10 @@ const config: HardhatUserConfig = {
       gasMultiplier: 2
     },
     goerli: {
-      url: `https://goerli.infura.io/v3/d8200853cc4c4001956d0c1a2d0de540`,
+      url: `https://endpoints.omniatech.io/v1/eth/goerli/public`,
       accounts: [`${mnemonic}`],
-      chainId: 5
+      chainId: 5,
+      gasMultiplier: 2
     },
     sepolia: {
       url: `https://rpc2.sepolia.org`,

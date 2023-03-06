@@ -49,22 +49,12 @@ describe("Token contract", async () => {
         WETH = await ethers.getContractAt("WETH9", "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6")
 
 
-        const iterableMappingFactory = await ethers.getContractFactory("IterableMapping")
-        const IterableMappingDeployed = await iterableMappingFactory.deploy()
-        await IterableMappingDeployed.deployed()
-        console.log({
-            IterableMappingDeployed: IterableMappingDeployed.address
-        })
 
 
         let contractName = "KittieNft"
         console.log(colors.yellow('Deploying ') + colors.cyan(contractName) + colors.yellow('...'));
 
-        const KittieNftFactory = await ethers.getContractFactory(contractName, {
-            libraries: {
-                IterableMapping: IterableMappingDeployed.address
-            },
-        });
+        const KittieNftFactory = await ethers.getContractFactory(contractName);
 
         kittieNft = await KittieNftFactory.deploy(
             1,

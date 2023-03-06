@@ -100,13 +100,13 @@ contract NftManager {
         );
 
         if (claimable1 > 0) {
-            kittieNftType1.claimRewards((account));
+            kittieNftType1.claimAllRewards((account));
         }
         if (claimable2 > 0) {
-            kittieNftType2.claimRewards((account));
+            kittieNftType2.claimAllRewards((account));
         }
         if (claimable3 > 0) {
-            kittieNftType3.claimRewards((account));
+            kittieNftType3.claimAllRewards((account));
         }
     }
 

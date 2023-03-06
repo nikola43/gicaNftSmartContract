@@ -23,12 +23,6 @@ import "./rarible/royalties/contracts/LibRoyaltiesV2.sol";
 //MerkleProof is needed to verify the merkle tree
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-// import console.log for debugging
-import "hardhat/console.sol";
-
-// import IterableMapping for store holders addresses
-import "./IterableMapping.sol";
-
 // interface for weth
 interface IWETH {
     function deposit() external payable;
@@ -53,7 +47,6 @@ contract KittieNft is
     RoyaltiesV2Impl
 {
     using Strings for uint256;
-    using IterableMapping for IterableMapping.Map;
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
@@ -131,7 +124,11 @@ contract KittieNft is
     }
 
     // upgrade by @shubhangdev
-    function getRewardsChange() internal view returns (uint256 wethBalanceChange) {
+    function getRewardsChange()
+        internal
+        view
+        returns (uint256 wethBalanceChange)
+    {
         uint256 wethBalance = getWethBalance();
         if (wethBalance <= lastRewardBalance) {
             wethBalanceChange = 0;
@@ -188,7 +185,8 @@ contract KittieNft is
 
     // upgrade by @shubhangdev
     // this function is to be called as view on the frontend to get claimable rewards
-    function getClaimableRewards(uint256 tokenId)
+
+    /*function getClaimableRewards(uint256 tokenId)
         public
         returns (uint256 claimableRewards)
     {
@@ -196,14 +194,41 @@ contract KittieNft is
         uint256 accumulatedRewards = getTokenAccumulatedRewards(tokenId);
         claimableRewards = accumulatedRewards - rewardsClaimed[tokenId];
     }
+    */
+
+    function getAllClaimableRewards(address account)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 accumulatedRewards = 0;
+
+        uint256[] memory ids = walletOfOwner(account);
+        for (uint256 i = 0; i < ids.length; i++) {
+            accumulatedRewards += getClaimableRewards(ids[i]);
+        }
+        
+        return accumulatedRewards;
+    }
+
+    function getClaimableRewards(uint256 tokenId)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 accumulatedRewards = getTokenAccumulatedRewards(tokenId);
+        return accumulatedRewards - rewardsClaimed[tokenId];
+    }
 
     // upgrade by @shubhangdev
     // function can be called by anyone but rewards are dispatched to owner only
     // on the frontend fetch tokens owned by the owner and call the claim function multiple times accordingly
-    function claimRewards(uint256 tokenId)
-        public
-        returns (uint256 claimableRewards)
-    {
+    function claimRewards(uint256 tokenId) public {
+        // update @TeslaDreams43
+        updateRewardsBank();
+        uint256 accumulatedRewards = getTokenAccumulatedRewards(tokenId);
+        uint256 claimableRewards = accumulatedRewards - rewardsClaimed[tokenId];
+
         claimableRewards = getClaimableRewards(tokenId);
         address tokenOwner = ownerOf(tokenId);
         rewardsClaimed[tokenId] += claimableRewards;
@@ -303,12 +328,9 @@ contract KittieNft is
     // function for get elapsed time between two timestamps
     function getElapsedTime(uint256 _startTime, uint256 _endTime)
         public
-        view
+        pure
         returns (uint256)
     {
-        console.log("Start time: %s", _startTime);
-        console.log("End time: %s", _endTime);
-        console.log("Elapsed time: %s", _endTime - _startTime);
         return _endTime - _startTime;
     }
 
